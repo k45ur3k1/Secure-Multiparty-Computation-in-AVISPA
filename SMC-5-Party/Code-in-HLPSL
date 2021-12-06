@@ -1,1 +1,230 @@
 
+role role_A(A,B,C,D,E:agent,
+        Ka,Kb,Kc,Kd,Ke:public_key,
+        SHA256:hash_func,
+        SND,RCV:channel(dy))
+played_by A
+def=
+	local
+		State:nat,
+	       	Xa,Ya,Xb,Yb,Xc,Yc,Xd,Yd,Xe,Ye:text            
+	init
+		State := 0
+	transition
+		1. State=0/\ RCV(start) =|> 
+      State':=1  /\ Xa':=new() /\ Ya':=new()
+		/\ SND({A.B.{Xa'}_Ka.{Ya'}_Ka}_Kb) 
+		/\ SND({A.C.{Xa'}_Ka.{Ya'}_Ka}_Kc)		
+    /\ SND({A.D.{Xa'}_Ka.{Ya'}_Ka}_Kd)	             
+    /\ SND({A.E.{Xa'}_Ka.{Ya'}_Ka}_Ke)
+			   
+		2. State=1 /\ RCV({A.B.{Xa}_Ka.{Ya}_Ka.{SHA256(Xb')}_Ka.{SHA256(Yb')}_Ka}_Ka) 
+   	=|> State':=2 /\ request(A,B,auth_1,Xa.Ya)   
+ 
+		3. State=2  /\ RCV({A.C.{Xa}_Ka.{Ya}_Ka.{SHA256(Xc')}_Ka.{SHA256(Yc')}_Ka}_Ka) 
+  	=|> State':=3  /\ request(A,C,auth_1,Xa.Ya)
+
+		4. State=3 /\ RCV({A.D.{Xa}_Ka.{Ya}_Ka.{SHA256(Xd')}_Ka.{SHA256(Yd')}_Ka}_Ka) 
+ 	  =|> State':=4  /\ request(A,D,auth_1,Xa.Ya) 	
+
+		5. State=4 /\ RCV({A.E.{Xa}_Ka.{Ya}_Ka.{SHA256(Xe')}_Ka.{SHA256(Ye')}_Ka}_Ka) 
+    =|> State':=5  /\ request(A,E,auth_1,Xa.Ya) 				 
+end role
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+role role_B(B,C,D,E,A:agent,
+ 	    Ka,Kb,Kc,Kd,Ke:public_key,
+	    SHA256:hash_func,
+	    SND,RCV:channel(dy))
+played_by B
+def=
+	local
+		State:nat,
+		      Xa,Ya,Xb,Yb,Xc,Yc,Xd,Yd,Xe,Ye:text 
+	init
+		State := 0
+	transition
+        1. State=0 /\ RCV({A.B.{Xa'}_Ka.{Ya'}_Ka}_Kb) =|>   State':=1 /\ Xb':=new() /\ Yb':=new()                   
+             /\ SND({A.B.{Xa'}_Ka.{Ya'}_Ka.{SHA256(Xb')}_Ka.{SHA256(Yb')}_Ka}_Ka) 
+            /\ SND({B.C.{Xb'}_Kb.{Yb'}_Kb}_Kc)
+            /\ SND({B.D.{Xb'}_Kb.{Yb'}_Kb}_Kd) 
+            /\ SND({B.E.{Xb'}_Kb.{Yb'}_Kb}_Ke)
+            /\ secret(SHA256(Xb).SHA256(Yb),sec_1,{A,B}) 
+            /\ witness(B,A,auth_1,Xa'.Ya')      
+		
+	        2.State=1
+          /\RCV({B.C.{Xb}_Kb.{Yb}_Kb.{SHA256(Xc')}_Kb.{SHA256(Yc')}_Kb}_Kb) 
+            =|> State':=2   /\ request(B,C,auth_1,Xb.Yb) 
+
+          3.State=2/\RCV({B.D.{Xb}_Kb.{Yb}_Kb.{SHA256(Xd')}_Kb.{SHA256(Yd')}_Kb}_Kb) 
+           =|> State':=3  /\ request(B,D,auth_1,Xb.Yb)
+	
+		4.State=3 /\ RCV({B.E.{Xb}_Kb.{Yb}_Kb.{SHA256(Xe')}_Kb.{SHA256(Ye')}_Kb}_Kb) 
+     =|> State':=4  /\ request(B,E,auth_1,Xb.Yb)     
+ 
+end role
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+role role_C(C,D,E,A,B:agent,
+ 	    Ka,Kb,Kc,Kd,Ke:public_key,
+	    SHA256:hash_func,
+	    SND,RCV:channel(dy))
+played_by C
+def=
+	local
+		State:nat,
+		Xa,Ya,Xb,Yb,Xc,Yc,Xd,Yd,Xe,Ye:text 
+	init
+		State := 0
+	transition
+      1. State=0 /\ RCV({A.C.{Xa'}_Ka.{Ya'}_Ka}_Kc)   
+        =|> State':=1 /\ Xc':=new() /\ Yc':=new()                   
+      /\ SND({A.C.{Xa'}_Ka.{Ya'}_Ka.{SHA256(Xc')}_Ka.{SHA256(Yc')}_Ka}_Ka) 
+      /\ secret(SHA256(Xc).SHA256(Yc),sec_1,{A,C}) 
+      /\ witness(C,A,auth_1,Xa'.Ya') 
+
+      2. State=1  
+      /\  RCV({B.C.{Xb'}_Kb.{Yb'}_Kb}_Kc)
+       =|> State':=2 /\ Xc':=new() /\ Yc':=new()                   
+      /\ SND({B.C.{Xb'}_Kb.{Yb'}_Kb.{SHA256(Xc')}_Kb.{SHA256(Yc')}_Kb}_Kb) 
+      /\ secret(SHA256(Xc).SHA256(Yc),sec_1,{B,C}) 
+      /\ witness(C,B,auth_1,Xb'.Yb') 
+      /\ SND({C.D.{Xc'}_Kc.{Yc'}_Kc}_Kd) 
+      /\ SND({C.E.{Xc'}_Kc.{Yc'}_Kc}_Ke)
+
+    3.State=2 
+    /\ RCV({C.D.{Xc}_Kc.{Yc}_Kc.{SHA256(Xd')}_Kc.{SHA256(Yd')}_Kc}_Kc) 
+    =|> State':=3   /\ request(C,D,auth_1,Xc.Yc) 
+
+    4. State=3 
+    /\   RCV({C.E.{Xc}_Kc.{Yc}_Kc.{SHA256(Xe')}_Kc.{SHA256(Ye')}_Kc}_Kc) 
+     =|> State':=4   /\ request(C,E,auth_1,Xc.Yc)  
+
+end role
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+role role_D(D,E,C,A,B:agent,
+ 	    Ka,Kb,Kc,Kd,Ke:public_key,
+	    SHA256:hash_func,
+	    SND,RCV:channel(dy))
+played_by D
+def=
+	local
+		State:nat,
+		Xa,Ya,Xb,Yb,Xc,Yc,Xd,Yd,Xe,Ye:text 
+	init
+		State := 0
+	transition
+    1.State=0 /\ RCV({A.D.{Xa'}_Ka.{Ya'}_Ka}_Kd) =|> State':=1 /\ Xd':=new() /\ Yd':=new()                   
+    /\ SND({A.D.{Xa'}_Ka.{Ya'}_Ka.{SHA256(Xd')}_Ka.{SHA256(Yd')}_Ka}_Ka) 
+    /\ secret(SHA256(Xd).SHA256(Yd),sec_1,{A,D}) 
+    /\ witness(D,A,auth_1,Xa'.Ya')     
+
+    2.State=1
+      /\  RCV({B.D.{Xb'}_Kb.{Yb'}_Kb}_Kd)
+    =|> State':=2 /\ Xd':=new() /\ Yd':=new()                   
+    /\ SND({B.D.{Xb'}_Kb.{Yb'}_Kb.{SHA256(Xd')}_Kb.{SHA256(Yd')}_Kb}_Kb) 
+    /\ secret(SHA256(Xd).SHA256(Yd),sec_1,{B,D}) 
+    /\ witness(D,B,auth_1,Xb'.Yb')    
+
+    3.State=2 /\ RCV({C.D.{Xc'}_Kc.{Yc'}_Kc}_Kd)
+             =|> State':=3 /\ Xd':=new() /\ Yd':=new()   	
+    /\ SND({C.D.{Xc'}_Kc.{Yc'}_Kc.{SHA256(Xd')}_Kc.{SHA256(Yd')}_Kc}_Kc) 
+    /\ secret(SHA256(Xd).SHA256(Yd),sec_1,{C,D}) 
+    /\ witness(D,C,auth_1,Xc'.Yc') 
+    /\ SND({D.E.{Xd'}_Kd.{Yd'}_Kd}_Ke)
+
+  4.State=3 
+  /\  RCV({D.E.{Xd}_Kd.{Yd}_Kd.{SHA256(Xe')}_Kd.{SHA256(Ye')}_Kd}_Kd) 
+   =|> State':=4 /\ request(D,E,auth_1,Xd.Yd)      
+               
+end role
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+role role_E(E,D,C,A,B:agent,
+ 	    Ka,Kb,Kc,Kd,Ke:public_key,
+	    SHA256:hash_func,
+	    SND,RCV:channel(dy))
+played_by E
+def=
+	local
+		State:nat,
+		Xa,Ya,Xb,Yb,Xc,Yc,Xd,Yd,Xe,Ye:text 
+	init
+		State := 0
+	transition
+    1.State=0 /\ RCV({A.E.{Xa'}_Ka.{Ya'}_Ka}_Ke) =|> State':=1 /\ Xe':=new() /\ Ye':=new()                   
+    /\ SND({A.E.{Xa'}_Ka.{Ya'}_Ka.{SHA256(Xe')}_Ka.{SHA256(Ye')}_Ka}_Ka) 
+    /\ secret(SHA256(Xe).SHA256(Ye),sec_1,{A,E}) 
+    /\ witness(E,A,auth_1,Xa'.Ya') 
+
+    2.State=1  
+    /\  RCV({B.E.{Xb'}_Kb.{Yb'}_Kb}_Ke) 
+    =|> State':=2 /\ Xe':=new() /\ Ye':=new()                   
+    /\ SND({B.E.{Xb'}_Kb.{Yb'}_Kb.{SHA256(Xe')}_Kb.{SHA256(Ye')}_Kb}_Kb) 
+    /\ secret(SHA256(Xe).SHA256(Ye),sec_1,{B,E}) 
+    /\ witness(E,B,auth_1,Xb'.Yb')  
+
+    3.State=2 
+    /\   RCV({C.E.{Xc'}_Kc.{Yc'}_Kc}_Ke) 
+    =|> State':=3 /\ Xe':=new() /\ Ye':=new()   	
+    /\ SND({C.E.{Xc'}_Kc.{Yc'}_Kc.{SHA256(Xe')}_Kc.{SHA256(Ye')}_Kc}_Kc) 
+    /\ secret(SHA256(Xe).SHA256(Ye),sec_1,{C,E}) 
+    /\ witness(E,C,auth_1,Xc'.Yc')
+
+    4.State=3
+     /\   RCV({D.E.{Xd'}_Kd.{Yd'}_Kd}_Ke)
+      =|> State':=4 /\ Xe':=new() /\ Ye':=new()   	
+    /\ SND({D.E.{Xd'}_Kd.{Yd'}_Kd.{SHA256(Xe')}_Kd.{SHA256(Ye')}_Kd}_Kd) 
+    /\ secret(SHA256(Xe).SHA256(Ye),sec_1,{D,E}) 
+    /\ witness(E,D,auth_1,Xd'.Yd') 
+
+end role
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+role session(A,B,C,D,E:agent,Xb,Yb,Xc,Yc,Xd,Yd,Xe,Ye:text,Ka,Kb,Kc,Kd,Ke:public_key,SHA256:hash_func)
+def=
+	local	
+      SND5,RCV5,SND4,RCV4,SND3, RCV3,SND2,RCV2,SND1,RCV1 :channel(dy)
+	composition
+       role_A(A,B,C,D,E,Ka,Kb,Kc,Kd,Ke,SHA256,SND1,RCV1)  		
+        /\ role_B(B,C,D,E,A,Ka,Kb,Kc,Kd,Ke,SHA256,SND2,RCV2) 		
+        /\role_C(C,D,E,A,B,Ka,Kb,Kc,Kd,Ke,SHA256, SND3,RCV3) 		
+        /\role_D(D,E,C,A,B,Ka,Kb,Kc,Kd,Ke,SHA256, SND4,RCV4)	
+        /\role_E(E,D,C,A,B,Ka,Kb,Kc,Kd,Ke,SHA256, SND4,RCV4)
+				 
+end role
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+role environment()
+def=
+	const
+		ka,kb,kc,kd,ke,ki:public_key,
+		a,b,c,d,e:agent,
+                	xb1,yb1,xc1,yc1,xd1,yd1,xe1,ye1:text,
+		sha256:hash_func,
+               	 sec_1,auth_1:protocol_id               
+		intruder_knowledge=  
+                 {a,b,c,d,e,ka,kb,kc,kd,ke,ki,inv(ki)}
+	composition
+           session(a,b,c,d,e,xb1,yb1,xc1,yc1,xd1,yd1,xe1,ye1,ka,kb,kc,kd,ke,sha256) 
+		
+end role
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+goal
+	secrecy_of sec_1
+  authentication_on auth_1
+
+end goal
+
+environment()
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
