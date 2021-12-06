@@ -1,1 +1,117 @@
-//add
+
+role role_A(A,B,C:agent,
+	    Ka,Kb,Kc:public_key,
+	    SHA256:hash_func,
+	    SND,RCV:channel(dy))
+played_by A
+def=
+	local
+		State:nat,
+	       	Xa,Ya,Xb,Yb,Xc,Yc:text            
+	init
+		State := 0
+	transition
+		1. State=0/\ RCV(start) =|> 
+                State':=1  /\ Xa':=new() /\ Ya':=new()
+		              /\ SND({A.B.{Xa'}_Ka.{Ya'}_Ka}_Kb) 
+			        /\ SND({A.C.{Xa'}_Ka.{Ya'}_Ka}_Kc)			   
+
+		2. State=1 /\ RCV({A.B.{Xa}_Ka.{Ya}_Ka.{SHA256(Xb')}_Ka.{SHA256(Yb')}_Ka}_Ka) 
+	         =|> State':=2 /\ request(A,B,auth_1,Xa.Ya)
+				      
+
+		3. State=2 /\ RCV({A.C.{Xa}_Ka.{Ya}_Ka.{SHA256(Xc')}_Ka.{SHA256(Yc')}_Ka}_Ka) 
+ 	         =|> State':=3  /\ request(A,C,auth_1,Xa.Ya) 					 
+end role
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+role role_B(B,C,A:agent,
+ 	    Ka,Kb,Kc:public_key,
+	    SHA256:hash_func,
+	    SND,RCV:channel(dy))
+played_by B
+def=
+	local
+		State:nat,
+		Xa,Ya,Xb,Yb,Xc,Yc:text 
+	init
+		State := 0
+	transition
+		1. State=0 /\ RCV({A.B.{Xa'}_Ka.{Ya'}_Ka}_Kb) =|> 
+              State':=2 /\ Xb':=new() /\ Yb':=new()                   
+		 /\ SND({A.B.{Xa'}_Ka.{Ya'}_Ka.{SHA256(Xb')}_Ka.{SHA256(Yb')}_Ka}_Ka) 
+             /\SND({B.C.{Xb'}_Kb.{Yb'}_Kb}_Kc)/\ secret(SHA256(Xb).SHA256(Yb),sec_1,{A,B}) 
+             /\ witness(B,A,auth_1,Xa'.Ya')      
+		
+	      2.State=2 /\ RCV({B.C.{Xb}_Kb.{Yb}_Kb.{SHA256(Xc')}_Kb.{SHA256(Yc')}_Kb}_Kb) 
+ 		=|> State':=4   /\ request(B,C,auth_1,Xb.Yb)     
+ 
+end role
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+role role_C(C,A,B:agent,
+ 	    Ka,Kb,Kc:public_key,
+	    SHA256:hash_func,
+	    SND,RCV:channel(dy))
+played_by C
+def=
+	local
+		State:nat,
+		Xa,Ya,Xb,Yb,Xc,Yc:text 
+	init
+		State := 0
+	transition
+		1. State=0 /\ RCV({A.C.{Xa'}_Ka.{Ya'}_Ka}_Kc) 
+		 =|> State':=2 /\ Xc':=new() /\ Yc':=new()                   
+               /\ SND({A.C.{Xa'}_Ka.{Ya'}_Ka.{SHA256(Xc')}_Ka.{SHA256(Yc')}_Ka}_Ka) 
+	         /\ secret(SHA256(Xc).SHA256(Yc),sec_1,{A,C}) 
+	         /\ witness(C,A,auth_1,Xa'.Ya')   
+	
+		2. State=2  /\  RCV({B.C.{Xb'}_Kb.{Yb'}_Kb}_Kc)
+		   =|> State':=4 /\ Xc':=new() /\ Yc':=new()                   
+                /\ SND({B.C.{Xb'}_Kb.{Yb'}_Kb.{SHA256(Xc')}_Kb.{SHA256(Yc')}_Kb}_Kb) 
+		   /\ secret(SHA256(Xc).SHA256(Yc),sec_1,{B,C}) 
+               /\ witness(C,B,auth_1,Xb'.Yb')     
+ 
+end role
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+role session(A,B,C:agent,Xb,Yb,Xc,Yc:text,Ka,Kb,Kc:public_key,SHA256:hash_func)
+def=
+	local
+		SND3,RCV3,SND2,RCV2,SND1,RCV1:channel(dy)
+	composition
+		 role_A(A,B,C,Ka,Kb,Kc,SHA256,SND1,RCV1)  
+		/\role_B(B,C,A,Ka,Kb,Kc,SHA256,SND2,RCV2) 
+		/\role_C(C,A,B,Ka,Kb,Kc,SHA256,SND3,RCV3) 
+				 
+end role
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+role environment()
+def=
+	const
+		ka,kb,kc,ki:public_key,
+		a,b,c:agent,
+            xb1,yb1,xc1,yc1:text,
+		sha256:hash_func,
+            sec_1,auth_1:protocol_id               
+		intruder_knowledge = {a,b,c,ka,kb,kc,ki,inv(ki)}
+	composition
+		session(a,b,c,xb1,yb1,xc1,yc1,ka,kb,kc,sha256) 
+		
+end role
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+goal
+	secrecy_of sec_1
+ 	authentication_on auth_1
+
+end goal
+
+environment()
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
