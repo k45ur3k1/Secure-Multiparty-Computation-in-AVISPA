@@ -1,1 +1,98 @@
-//add code. 
+%%%Using Private key of A inv(Ka) || safe
+%%%text is the data type for uninterpreted bit string 
+%%% ' = variable value when transmitting it 
+%%% Dolev Yao model 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%A send Kb and RCV Ka 
+
+role role_A(A:agent,B:agent,
+	    Ka,Kb:public_key,
+	    SHA256:hash_func,
+	    SND,RCV:channel(dy))
+played_by A
+def=
+	local
+		State:nat,
+	       	Xa:text,Xb:text,Ya:text,Yb:text            
+	init
+		State := 0
+	transition
+		1. State=0 /\ RCV(start) =|> 
+                                    State':=1  /\ Xa':=new() /\ Ya':=new()
+		                     /\ SND({{Xa'}_Ka.{Ya'}_Ka}_Kb) 
+			     /\ secret(Xa'.Ya', sec_1,{A,B})
+
+		2. State=1 /\ RCV({{Xa'}_Ka.{Ya'}_Ka.{SHA256(Xb')}_Ka.{SHA256(Yb')}_Ka}_Ka) =|> 
+                                    State':=2 /\ SND({{SHA256(Xb')}_Ka.{SHA256(Yb')}_Ka}_Kb)  
+% Alice checks that the received Xa and Ya corresponds to the nonce she sent earlier
+			    /\ request(A,B,auth_1,Xa'.Ya') 
+% Alice sends Xb and Yb to prove her identity
+			    /\ witness(A,B,auth_2,SHA256(Xb').SHA256(Yb'))
+end role
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%B send Ka and RCV Kb
+
+role role_B(B:agent,A:agent,
+ 	    Ka,Kb:public_key,
+	    SHA256:hash_func,
+	    SND,RCV:channel(dy))
+played_by B
+def=
+	local
+		State:nat,
+		Xa:text,Ya:text,Xb:text,Yb:text
+	init
+		State := 0
+	transition
+		1. State=0 /\ RCV({{Xa'}_Ka.{Ya'}_Ka}_Kb) =|> 
+                                    State':=1 /\ Xb':=new() /\ Yb':=new() 
+	                                     /\ SND({{Xa'}_Ka.{Ya'}_Ka.{SHA256(Xb')}_Ka.{SHA256(Yb')}_Ka}_Ka) 
+		                     /\ secret(SHA256(Xb').SHA256(Yb'),sec_1,{A,B})
+ % Bob sends Xa' and Ya' to prove his identity
+		                     /\ witness(B,A,auth_1,Xa'.Ya')                
+
+		2.    State=1 /\ RCV({{SHA256(Xb')}_Ka.{SHA256(Yb')}_Ka}_Kb) =|>
+% Bob checks that the received Xb and Yb corresponds to the nonce he sent earlier 
+		       State' :=2 /\ request(B,A,auth_2,SHA256(Xb').SHA256(Yb')) 
+end role
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+role session(A:agent,B:agent,Xb:text,Yb:text,SHA256:hash_func,Ka:public_key,Kb:public_key)
+def=
+	local
+		SND2,RCV2,SND1,RCV1:channel(dy)
+	composition
+		 role_A(A,B,Ka,Kb,SHA256,SND1,RCV1)  
+		/\  role_B(B,A,Ka,Kb,SHA256,SND2,RCV2)  
+		 
+end role
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+role environment()
+def=
+	const
+		ka,kb,ki:public_key,
+		alice,bob:agent,
+                                xa1,ya1,xb1,yb1:text,
+		sha256:hash_func,
+                                sec_1,auth_1,auth_2:protocol_id               
+		intruder_knowledge = {alice,bob,ka,kb.ki,inv(ki)}
+	composition
+		session(alice,bob,xb1,yb1,sha256,ka,kb) %%/\ session(alice,bob,xb1,yb1,sha256,ka)
+end role
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+goal
+	secrecy_of sec_1
+      	authentication_on auth_1
+	authentication_on auth_2
+end goal
+
+environment()
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
